@@ -69,7 +69,10 @@ public class UserServiceImpl implements UserService {
     @Override
     public boolean rateWithTitle(Integer id, String rate, HttpSession session) {
         System.out.println(rate.charAt(11));
-        Double rating = Double.parseDouble(String.valueOf(rate.charAt(11)));
+        double rating = Double.parseDouble(String.valueOf(rate.charAt(11)));
+        if(rate.charAt(12)=='0'){
+            rating=10.0;
+        }
         UserInfo userInfo = (UserInfo) session.getAttribute("userInfo");
         if(userInfo==null){
             return false;

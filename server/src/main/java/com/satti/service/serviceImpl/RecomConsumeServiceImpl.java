@@ -2,13 +2,18 @@ package com.satti.service.serviceImpl;
 
 import com.satti.entity.UserBehaviorEvent;
 import com.satti.service.RecomConsumeService;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 @Service
@@ -19,8 +24,66 @@ public class RecomConsumeServiceImpl implements RecomConsumeService {
     private static final Double WATCH_WEIGHT = 5.0;
     private static final Double RATE_WEIGHT = 5.0;
 
+    // 批量写入的缓冲区
+    private static final int BATCH_SIZE = 100;
+    private final List<UserBehaviorEvent> buffer = Collections.synchronizedList(new ArrayList<>());
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
     @Autowired
     private RedisTemplate<String,String> redisTemplate;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private void flushBufferToMySQL() {
+        if (buffer.isEmpty()) return;
+
+        List<UserBehaviorEvent> copy;
+        synchronized (buffer) {
+            System.out.println("Flushing buffer to MySQL, size: " + buffer);
+            copy = new ArrayList<>(buffer);
+            buffer.clear();
+        }
+        // 去重逻辑：根据 contact, movieId, behavior 以及时间戳
+        Map<String, UserBehaviorEvent> latestEvents = copy.stream()
+                .collect(Collectors.toMap(
+                        event -> event.getContact() + "|" + event.getMovieId() + "|" + event.getBehavior(),
+                        event -> event,
+                        (existing, replacement) ->
+                                existing.getTimestamp() > replacement.getTimestamp() ? existing : replacement
+                ));
+
+        List<UserBehaviorEvent> distinctEvents = new ArrayList<>(latestEvents.values());
+
+        String sql = """
+        INSERT INTO user_behavior (contact, movie_id, behavior_type, timestamp)
+        VALUES (?,?,?,?)
+        ON DUPLICATE KEY UPDATE timestamp = VALUES(timestamp)
+        """;
+
+        jdbcTemplate.batchUpdate(sql, distinctEvents, distinctEvents.size(), (ps, event) -> {
+            ps.setString(1, event.getContact());
+            ps.setInt(2, event.getMovieId());
+            ps.setString(3, event.getBehavior().name());
+            ps.setLong(4, event.getTimestamp());
+        });
+
+        log.info("写入/更新 {} 条行为数据到MySQL (去重后: {})",
+                copy.size(), distinctEvents.size());
+    }
+
+    /*
+     * 定时任务，每5秒钟将缓冲区数据写入MySQL
+     */
+    @PostConstruct
+    public void init(){
+        scheduler.scheduleAtFixedRate(this::flushBufferToMySQL,5,15, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    @PreDestroy
+    public void onShutdown() {
+        flushBufferToMySQL(); // 关闭时强制刷新
+        scheduler.shutdown();
+    }
 
     @KafkaListener(topics = USER_BEHAVIOR_TOPIC,groupId = "movie-recommendation-group")
     @Override
@@ -28,6 +91,14 @@ public class RecomConsumeServiceImpl implements RecomConsumeService {
         updateUserBehavior(event);
         // 生成用户推荐
         generateRecommendations(event.getContact());
+        if(event.getRating()==null) {
+            synchronized (buffer) {
+                buffer.add(event);
+                if (buffer.size() >= BATCH_SIZE) {
+                    flushBufferToMySQL();
+                }
+            }
+        }
     }
 
     private void updateUserBehavior(UserBehaviorEvent event) {
@@ -38,7 +109,8 @@ public class RecomConsumeServiceImpl implements RecomConsumeService {
         // 限制排行榜长度为50
         redisTemplate.opsForZSet().removeRange(userKey+":views",0,-51);
         if(event.getBehavior()== UserBehaviorEvent.BehaviorType.RATE){
-            redisTemplate.opsForHash().put(userKey+":ratings",event.getMovieId(),event.getRating().toString());
+            System.out.println("rating: "+event.getRating());
+            redisTemplate.opsForHash().put(userKey+":ratings",event.getMovieId().toString(),event.getRating().toString());
         }
         if(event.getBehavior()== UserBehaviorEvent.BehaviorType.WATCH_TOGETHER){
             redisTemplate.opsForZSet().add(userKey+":watch_together",event.getMovieId().toString(),event.getTimestamp());

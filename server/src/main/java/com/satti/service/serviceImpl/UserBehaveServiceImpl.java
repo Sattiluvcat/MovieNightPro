@@ -52,7 +52,9 @@ public class UserBehaveServiceImpl implements UserBehaveService {
             userBehaviorEvent.setBehavior(UserBehaviorEvent.BehaviorType.RATE);
             userBehaviorEvent.setContact(userInfo.getContact());
             userBehaviorEvent.setMovieId(id);
-            userBehaviorEvent.setRating(Double.parseDouble(String.valueOf(rate.charAt(11))));
+            if(rate.charAt(12)=='0'){
+                userBehaviorEvent.setRating(10.0);
+            } else userBehaviorEvent.setRating(Double.parseDouble(String.valueOf(rate.charAt(11))));
             userBehaviorEvent.setTimestamp(System.currentTimeMillis());
             kafkaProducerService.sendUserBehavior(userBehaviorEvent);
         }

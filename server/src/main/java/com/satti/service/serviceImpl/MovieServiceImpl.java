@@ -182,7 +182,7 @@ public class MovieServiceImpl implements MovieService {
         String emailContent = String.format("用户 %s (%s) 邀请你一起看: %s\n联系方式: %s",
                 userInfo.getNickname(), userInfo.getTitle(), title, userInfo.getContact());
         System.out.println(emailContent);
-        mailService.sendSimpleMail("satti_chu@foxmail.com", "一起看电影", emailContent);
+        mailService.sendSimpleMail("address@mail.com", "一起看电影", emailContent);
         return true;
     }
 
@@ -197,7 +197,7 @@ public class MovieServiceImpl implements MovieService {
         System.out.println(info);
         String emailContent = String.format("用户 %s (%s) 对电影: %s\n发布了评论: %s\n联系方式: %s",
                 userInfo.getNickname(), userInfo.getTitle(), title, info, userInfo.getContact());
-        mailService.sendSimpleMail("satti_chu@foxmail.com", "电影评论", emailContent);
+        mailService.sendSimpleMail("address@mail.com", "电影评论", emailContent);
         return true;
     }
 

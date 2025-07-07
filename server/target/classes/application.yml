@@ -1,0 +1,69 @@
+server:
+  port: 8081
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  profiles:
+    active: dev
+  elasticsearch:
+    uris: http://localhost:9200
+  kafka:
+    bootstrap-servers: localhost:9092
+    properties:
+      security.protocol: PLAINTEXT
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+    consumer:
+      group-id: movie-recommendation-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.satti.*"
+        auto.offset.reset: earliest
+  main:
+     allow-circular-references: true
+#  此处不写 druid 直接注明 datasource
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/movie_night?useUnicode=true&characterEncoding=UTF-8&useSSL=false
+    username: root
+    password: 123456abc
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/movie_night
+    redis:
+      host: localhost
+      port: 6379
+  mail:
+    host: smtp.qq.com
+    username: 1654172301@qq.com
+    password: vtxqqdtrhcvceiec
+    default-encoding: UTF-8
+    protocol: smtp
+    properties:
+        mail:
+          smtp:
+            auth: true
+            starttls:
+              enable: true
+              required: true
+            ssl:
+              enable: true
+            socketFactory:
+              port: 465
+              class: javax.net.ssl.SSLSocketFactory
+    port: 465
+
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.satti.entity
+  configuration:
+    map-underscore-to-camel-case: true

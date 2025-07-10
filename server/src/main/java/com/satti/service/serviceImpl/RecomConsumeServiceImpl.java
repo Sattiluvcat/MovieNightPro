@@ -148,7 +148,7 @@ public class RecomConsumeServiceImpl implements RecomConsumeService {
         Map<String,Double> candidateMovies=new HashMap<>();
         List<String> topTags=userTagPreferences.entrySet().stream()
                 .sorted(Map.Entry.<String,Double>comparingByValue().reversed())
-                .limit(50)
+                .limit(20)
                 .map(Map.Entry::getKey)
                 .toList();
         if(!topTags.isEmpty()){
@@ -184,7 +184,7 @@ public class RecomConsumeServiceImpl implements RecomConsumeService {
         }
         return candidateMovies.entrySet().stream()
                 .sorted(Map.Entry.<String,Double>comparingByValue().reversed())
-                .limit(50)
+                .limit(20)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
     }
